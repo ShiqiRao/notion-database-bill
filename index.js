@@ -1,4 +1,5 @@
 import { Client } from "@notionhq/client";
+import hash from 'object-hash';
 import xlsx from 'xlsx';
 import { auth, databaseId } from "./config.js";
 
@@ -13,6 +14,12 @@ while (readLine(cursor, worksheet)) {
     cursor++;
 }
 
+const startAndEnd = getStartAndEnd(worksheet['A3'].v);
+const pages = await getPagesFromNotionDatabase(startAndEnd[0], startAndEnd[1]);
+const hashedPages = [];
+pages.forEach(o => hashedPages[hash(o)] = 1);
+console.log(pages);
+console.log(new Date(pages[0].date));
 
 
 async function addItem(date, title, income, expenses) {
@@ -74,20 +81,34 @@ function readLine(lineNumber, worksheet) {
         if (type == '收入') {
             expenses = moneyToNumber(amount);
         }
-        console.log(`${date_string} ${title} ${type} ${income} ${expenses}`);
-        addItem(date_string, title, income, expenses);
+        console.log(`${date_string} ${title} ${income} ${expenses}`);
+        // addItem(date_string, title, income, expenses);
         return true;
     }
     return false;
 }
 
-async function getPagesFromNotionDatabase() {
+async function getPagesFromNotionDatabase(start, end) {
     const pages = []
     let cursor = undefined
     while (true) {
         const { results, next_cursor } = await notion.databases.query({
             database_id: databaseId,
             start_cursor: cursor,
+            filter: {
+                "and": [{
+                    "property": "日期",
+                    "date": {
+                        "on_or_after": start
+                    }
+                },
+                {
+                    "property": "日期",
+                    "date": {
+                        "on_or_before": end
+                    }
+                }]
+            }
         })
         pages.push(...results)
         if (!next_cursor) {
@@ -95,11 +116,19 @@ async function getPagesFromNotionDatabase() {
         }
         cursor = next_cursor
     }
-    console.log(pages);
-    console.log(`${pages.length} pages successfully fetched.`)
+    // console.log(pages);
+    // console.log(`${pages.length} pages successfully fetched.`)
     return pages.map(page => {
         return {
             pageId: page.id,
+            title: page.properties["项目名"].title[0].text.content,
+            date: page.properties["日期"].date.start,
+            expenses: page.properties["支出"].number,
+            income: page.properties["收入"].number,
         }
     })
+}
+
+function getStartAndEnd(info) {
+    return [info.substring(6, 16), info.substring(33, 43)];
 }

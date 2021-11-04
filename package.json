@@ -6,6 +6,7 @@
   "main": "index.js",
   "dependencies": {
     "@notionhq/client": "^0.1.9",
+    "object-hash": "^2.2.0",
     "xlsx": "^0.17.2"
   }
 }
